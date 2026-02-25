@@ -7,7 +7,7 @@
       class="folder-card"
       :style="cardStyle"
     >
-      <!-- ── Action Row ──────────────────────────────────────── -->
+      <!-- Action Row -->
       <div class="card-actions">
         <button
           class="btn-action btn-open"
@@ -27,7 +27,7 @@
         </button>
       </div>
 
-      <!-- ── Folder Name ─────────────────────────────────────── -->
+      <!-- Folder Name -->
       <div class="card-field folder-name-field">
         <span
           class="folder-name"
@@ -42,7 +42,7 @@
         </span>
       </div>
 
-      <!-- ── Files ──────────────────────────────────────────── -->
+      <!-- Files -->
       <div class="card-field">
         <span class="field-label" :style="labelStyle">Files</span>
         <span class="field-value" :style="valueStyle">
@@ -50,7 +50,7 @@
         </span>
       </div>
 
-      <!-- ── AI Policy ──────────────────────────────────────── -->
+      <!-- AI Policy -->
       <div class="card-field">
         <span class="field-label" :style="labelStyle">AI Policy</span>
         <span class="field-value ai-policy-value" :style="valueStyle">
@@ -63,7 +63,7 @@
         </span>
       </div>
 
-      <!-- ── Active Public Page ─────────────────────────────── -->
+      <!-- Active Public Page -->
       <div class="card-field">
         <span class="field-label" :style="labelStyle">Active Public Page</span>
         <span class="field-value checkbox-value">
@@ -95,7 +95,7 @@
       </div>
     </div>
 
-    <!-- ── Empty state ────────────────────────────────────────── -->
+    <!-- Empty state -->
     <div
       v-if="!processedItems.length"
       class="empty-state"
@@ -127,11 +127,7 @@ export default {
     const isEditing = computed(() => props.wwEditorState?.isEditing);
     /* wwEditor:end */
 
-    // ============================================================
-    // INTERNAL VARIABLES (exposed to NoCode workflows)
-    // ============================================================
-
-    // selectedItem — full folder object of the last interacted card
+    // Internal variables
     const { value: selectedItem, setValue: setSelectedItem } =
       wwLib.wwVariable.useComponentVariable({
         uid: props.uid,
@@ -140,7 +136,6 @@ export default {
         defaultValue: null,
       });
 
-    // itemCount — total number of cards currently rendered
     const { value: itemCount, setValue: setItemCount } =
       wwLib.wwVariable.useComponentVariable({
         uid: props.uid,
@@ -149,9 +144,7 @@ export default {
         defaultValue: 0,
       });
 
-    // ============================================================
-    // PROCESSED ITEMS (fully reactive via computed)
-    // ============================================================
+    // Processed items
     const processedItems = computed(() => {
       const items = props.content?.data || [];
       const { resolveMappingFormula } = wwLib.wwFormula.useFormula();
@@ -160,23 +153,13 @@ export default {
         const id =
           resolveMappingFormula(props.content?.dataIdFormula, item) ?? item?.id;
         const name =
-          resolveMappingFormula(props.content?.dataNameFormula, item) ??
-          item?.name;
+          resolveMappingFormula(props.content?.dataNameFormula, item) ?? item?.name;
         const file_count =
-          resolveMappingFormula(
-            props.content?.dataFileCountFormula,
-            item
-          ) ?? item?.file_count;
+          resolveMappingFormula(props.content?.dataFileCountFormula, item) ?? item?.file_count;
         const read_content_mode =
-          resolveMappingFormula(
-            props.content?.dataReadContentModeFormula,
-            item
-          ) ?? item?.read_content_mode;
+          resolveMappingFormula(props.content?.dataReadContentModeFormula, item) ?? item?.read_content_mode;
         const has_public_portal =
-          resolveMappingFormula(
-            props.content?.dataHasPublicPortalFormula,
-            item
-          ) ?? item?.has_public_portal;
+          resolveMappingFormula(props.content?.dataHasPublicPortalFormula, item) ?? item?.has_public_portal;
 
         return {
           ...item,
@@ -185,13 +168,11 @@ export default {
           file_count: file_count ?? 0,
           read_content_mode: read_content_mode ?? '',
           has_public_portal: Boolean(has_public_portal),
-          // Keep original for trigger event payloads
           _original: item,
         };
       });
     });
 
-    // Keep itemCount variable in sync
     watch(
       processedItems,
       (items) => {
@@ -200,19 +181,10 @@ export default {
       { immediate: true }
     );
 
-    // ============================================================
-    // COMPUTED STYLES (CSS variables + inline where needed)
-    // ============================================================
+    // Computed styles
+    const resolvedPrimaryColor = computed(() => props.content?.primaryColor || '#2d6a4f');
+    const resolvedOutlineColor = computed(() => props.content?.outlineColor || '#2d6a4f');
 
-    // Primary resolved colours used in JS (SVG / dynamic fills)
-    const resolvedPrimaryColor = computed(
-      () => props.content?.primaryColor || '#2d6a4f'
-    );
-    const resolvedOutlineColor = computed(
-      () => props.content?.outlineColor || '#2d6a4f'
-    );
-
-    // Root container: sets all CSS variables for descendants
     const containerStyle = computed(() => ({
       '--fcl-primary': resolvedPrimaryColor.value,
       '--fcl-outline': resolvedOutlineColor.value,
@@ -281,9 +253,7 @@ export default {
       fontSize: `${props.content?.fontSize ?? 14}px`,
     }));
 
-    // ============================================================
-    // AI POLICY HELPERS
-    // ============================================================
+    // AI Policy helpers
     const getAiPolicyText = (mode) => {
       const m = String(mode ?? '').trim();
       if (m === 'Enabled') return 'Deep scan (content analysis)';
@@ -298,42 +268,27 @@ export default {
       return '';
     };
 
-    // ============================================================
-    // EVENT HANDLERS
-    // ============================================================
+    // Event handlers
     const handleOpen = (item) => {
       const payload = item?._original ?? item;
       setSelectedItem(payload);
-      emit('trigger-event', {
-        name: 'open-click',
-        event: { folder: payload },
-      });
+      emit('trigger-event', { name: 'open-click', event: { folder: payload } });
     };
 
     const handleEdit = (item) => {
       const payload = item?._original ?? item;
       setSelectedItem(payload);
-      emit('trigger-event', {
-        name: 'edit-click',
-        event: { folder: payload },
-      });
+      emit('trigger-event', { name: 'edit-click', event: { folder: payload } });
     };
 
     const handleNameClick = (item) => {
       const payload = item?._original ?? item;
       setSelectedItem(payload);
-      emit('trigger-event', {
-        name: 'name-click',
-        event: { folder: payload },
-      });
+      emit('trigger-event', { name: 'name-click', event: { folder: payload } });
     };
 
-    // ============================================================
-    // EXPOSE TO TEMPLATE
-    // ============================================================
     return {
       processedItems,
-      // Styles
       containerStyle,
       cardStyle,
       openButtonStyle,
@@ -344,14 +299,11 @@ export default {
       checkedBoxStyle,
       uncheckedBoxStyle,
       emptyStateStyle,
-      // Helpers
       getAiPolicyText,
       getAiPolicyIcon,
-      // Handlers
       handleOpen,
       handleEdit,
       handleNameClick,
-      // Internal variables (available via WeWeb variable panel)
       selectedItem,
       itemCount,
       /* wwEditor:start */
@@ -362,18 +314,12 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
-// ─────────────────────────────────────────────────────────────────────────────
-// ROOT WRAPPER — never hardcode width/height; adapts to WeWeb dimensions
-// ─────────────────────────────────────────────────────────────────────────────
+<style scoped>
 .folder-card-list {
   width: 100%;
   box-sizing: border-box;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CARD
-// ─────────────────────────────────────────────────────────────────────────────
 .folder-card {
   width: 100%;
   box-sizing: border-box;
@@ -381,17 +327,12 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 10px;
-
-  // Defaults via CSS variables set on the root
   background: var(--fcl-card-bg, #ffffff);
   border: 1px solid var(--fcl-card-border, #e5e7eb);
   border-radius: var(--fcl-card-radius, 8px);
   font-size: var(--fcl-font-size, 14px);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ACTION ROW
-// ─────────────────────────────────────────────────────────────────────────────
 .card-actions {
   display: flex;
   flex-direction: row;
@@ -404,7 +345,7 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 6px 18px;
-  border-radius: 999px;           // Pill shape
+  border-radius: 999px;
   font-size: var(--fcl-font-size, 14px);
   font-weight: 500;
   line-height: 1.4;
@@ -412,37 +353,19 @@ export default {
   cursor: pointer;
   transition: opacity 0.15s ease, box-shadow 0.15s ease;
   user-select: none;
-
-  &:hover {
-    opacity: 0.82;
-  }
-
-  &:active {
-    opacity: 0.65;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--fcl-primary, #2d6a4f);
-    outline-offset: 2px;
-  }
 }
 
-.btn-open {
-  // Colours driven by inline style from openButtonStyle computed
-  border: 1.5px solid transparent;
+.btn-action:hover { opacity: 0.82; }
+.btn-action:active { opacity: 0.65; }
+.btn-action:focus-visible {
+  outline: 2px solid var(--fcl-primary, #2d6a4f);
+  outline-offset: 2px;
 }
 
-.btn-edit {
-  // Colours driven by inline style from editButtonStyle computed
-  border: 1.5px solid;
-}
+.btn-open { border: 1.5px solid transparent; }
+.btn-edit { border: 1.5px solid; }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FOLDER NAME
-// ─────────────────────────────────────────────────────────────────────────────
-.folder-name-field {
-  margin-top: 2px;
-}
+.folder-name-field { margin-top: 2px; }
 
 .folder-name {
   color: var(--fcl-name-color, #2d6a4f);
@@ -453,21 +376,15 @@ export default {
   cursor: pointer;
   transition: opacity 0.15s ease;
   display: inline;
-
-  &:hover {
-    opacity: 0.72;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--fcl-name-color, #2d6a4f);
-    outline-offset: 2px;
-    border-radius: 2px;
-  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FIELD ROWS (label + value)
-// ─────────────────────────────────────────────────────────────────────────────
+.folder-name:hover { opacity: 0.72; }
+.folder-name:focus-visible {
+  outline: 2px solid var(--fcl-name-color, #2d6a4f);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .card-field {
   display: flex;
   flex-direction: row;
@@ -494,9 +411,6 @@ export default {
   gap: 4px;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AI POLICY
-// ─────────────────────────────────────────────────────────────────────────────
 .ai-policy-value {
   display: flex;
   align-items: center;
@@ -509,9 +423,6 @@ export default {
   flex-shrink: 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CHECKBOX (display-only)
-// ─────────────────────────────────────────────────────────────────────────────
 .checkbox-value {
   display: flex;
   align-items: center;
@@ -531,8 +442,6 @@ export default {
   pointer-events: none;
   user-select: none;
   transition: background-color 0.15s ease, border-color 0.15s ease;
-
-  // Checked state colours are driven by inline checkedBoxStyle
 }
 
 .checkmark-icon {
@@ -540,9 +449,6 @@ export default {
   flex-shrink: 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EMPTY STATE
-// ─────────────────────────────────────────────────────────────────────────────
 .empty-state {
   width: 100%;
   padding: 32px 16px;
