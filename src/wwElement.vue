@@ -1,0 +1,554 @@
+<template>
+  <div class="folder-card-list" :style="containerStyle">
+    <!-- Card for each processed folder -->
+    <div
+      v-for="item in processedItems"
+      :key="item.id"
+      class="folder-card"
+      :style="cardStyle"
+    >
+      <!-- ── Action Row ──────────────────────────────────────── -->
+      <div class="card-actions">
+        <button
+          class="btn-action btn-open"
+          :style="openButtonStyle"
+          type="button"
+          @click="handleOpen(item)"
+        >
+          Open
+        </button>
+        <button
+          class="btn-action btn-edit"
+          :style="editButtonStyle"
+          type="button"
+          @click="handleEdit(item)"
+        >
+          Edit
+        </button>
+      </div>
+
+      <!-- ── Folder Name ─────────────────────────────────────── -->
+      <div class="card-field folder-name-field">
+        <span
+          class="folder-name"
+          :style="folderNameStyle"
+          role="button"
+          tabindex="0"
+          @click="handleNameClick(item)"
+          @keydown.enter="handleNameClick(item)"
+          @keydown.space.prevent="handleNameClick(item)"
+        >
+          {{ item.name }}
+        </span>
+      </div>
+
+      <!-- ── Files ──────────────────────────────────────────── -->
+      <div class="card-field">
+        <span class="field-label" :style="labelStyle">Files</span>
+        <span class="field-value" :style="valueStyle">
+          {{ item.file_count ?? 0 }}
+        </span>
+      </div>
+
+      <!-- ── AI Policy ──────────────────────────────────────── -->
+      <div class="card-field">
+        <span class="field-label" :style="labelStyle">AI Policy</span>
+        <span class="field-value ai-policy-value" :style="valueStyle">
+          <span
+            v-if="getAiPolicyIcon(item.read_content_mode)"
+            class="ai-policy-icon"
+            aria-hidden="true"
+          >{{ getAiPolicyIcon(item.read_content_mode) }}</span>
+          {{ getAiPolicyText(item.read_content_mode) }}
+        </span>
+      </div>
+
+      <!-- ── Active Public Page ─────────────────────────────── -->
+      <div class="card-field">
+        <span class="field-label" :style="labelStyle">Active Public Page</span>
+        <span class="field-value checkbox-value">
+          <span
+            class="checkbox-box"
+            :class="{ 'checkbox-checked': item.has_public_portal }"
+            :style="item.has_public_portal ? checkedBoxStyle : uncheckedBoxStyle"
+            aria-hidden="true"
+          >
+            <svg
+              v-if="item.has_public_portal"
+              class="checkmark-icon"
+              width="10"
+              height="8"
+              viewBox="0 0 10 8"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M1 4L3.5 6.5L9 1"
+                stroke="white"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+        </span>
+      </div>
+    </div>
+
+    <!-- ── Empty state ────────────────────────────────────────── -->
+    <div
+      v-if="!processedItems.length"
+      class="empty-state"
+      :style="emptyStateStyle"
+    >
+      No folders to display.
+    </div>
+  </div>
+</template>
+
+<script>
+import { computed, watch } from 'vue';
+
+export default {
+  name: 'FolderCardList',
+
+  props: {
+    uid: { type: String, required: true },
+    content: { type: Object, required: true },
+    /* wwEditor:start */
+    wwEditorState: { type: Object, required: true },
+    /* wwEditor:end */
+  },
+
+  emits: ['trigger-event'],
+
+  setup(props, { emit }) {
+    /* wwEditor:start */
+    const isEditing = computed(() => props.wwEditorState?.isEditing);
+    /* wwEditor:end */
+
+    // ============================================================
+    // INTERNAL VARIABLES (exposed to NoCode workflows)
+    // ============================================================
+
+    // selectedItem — full folder object of the last interacted card
+    const { value: selectedItem, setValue: setSelectedItem } =
+      wwLib.wwVariable.useComponentVariable({
+        uid: props.uid,
+        name: 'selectedItem',
+        type: 'object',
+        defaultValue: null,
+      });
+
+    // itemCount — total number of cards currently rendered
+    const { value: itemCount, setValue: setItemCount } =
+      wwLib.wwVariable.useComponentVariable({
+        uid: props.uid,
+        name: 'itemCount',
+        type: 'number',
+        defaultValue: 0,
+      });
+
+    // ============================================================
+    // PROCESSED ITEMS (fully reactive via computed)
+    // ============================================================
+    const processedItems = computed(() => {
+      const items = props.content?.data || [];
+      const { resolveMappingFormula } = wwLib.wwFormula.useFormula();
+
+      return items.map((item) => {
+        const id =
+          resolveMappingFormula(props.content?.dataIdFormula, item) ?? item?.id;
+        const name =
+          resolveMappingFormula(props.content?.dataNameFormula, item) ??
+          item?.name;
+        const file_count =
+          resolveMappingFormula(
+            props.content?.dataFileCountFormula,
+            item
+          ) ?? item?.file_count;
+        const read_content_mode =
+          resolveMappingFormula(
+            props.content?.dataReadContentModeFormula,
+            item
+          ) ?? item?.read_content_mode;
+        const has_public_portal =
+          resolveMappingFormula(
+            props.content?.dataHasPublicPortalFormula,
+            item
+          ) ?? item?.has_public_portal;
+
+        return {
+          ...item,
+          id: id ?? `item-${Math.random()}`,
+          name: name ?? 'Untitled',
+          file_count: file_count ?? 0,
+          read_content_mode: read_content_mode ?? '',
+          has_public_portal: Boolean(has_public_portal),
+          // Keep original for trigger event payloads
+          _original: item,
+        };
+      });
+    });
+
+    // Keep itemCount variable in sync
+    watch(
+      processedItems,
+      (items) => {
+        setItemCount(items?.length ?? 0);
+      },
+      { immediate: true }
+    );
+
+    // ============================================================
+    // COMPUTED STYLES (CSS variables + inline where needed)
+    // ============================================================
+
+    // Primary resolved colours used in JS (SVG / dynamic fills)
+    const resolvedPrimaryColor = computed(
+      () => props.content?.primaryColor || '#2d6a4f'
+    );
+    const resolvedOutlineColor = computed(
+      () => props.content?.outlineColor || '#2d6a4f'
+    );
+
+    // Root container: sets all CSS variables for descendants
+    const containerStyle = computed(() => ({
+      '--fcl-primary': resolvedPrimaryColor.value,
+      '--fcl-outline': resolvedOutlineColor.value,
+      '--fcl-card-bg': props.content?.cardBackground || '#ffffff',
+      '--fcl-card-border': props.content?.cardBorderColor || '#e5e7eb',
+      '--fcl-card-radius': `${props.content?.cardBorderRadius ?? 8}px`,
+      '--fcl-label-color': props.content?.labelTextColor || '#6b7280',
+      '--fcl-value-color': props.content?.valueTextColor || '#111827',
+      '--fcl-name-color': props.content?.folderNameColor || '#2d6a4f',
+      '--fcl-gap': `${props.content?.cardGap ?? 12}px`,
+      '--fcl-font-size': `${props.content?.fontSize ?? 14}px`,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: `${props.content?.cardGap ?? 12}px`,
+      width: '100%',
+    }));
+
+    const cardStyle = computed(() => ({
+      background: props.content?.cardBackground || '#ffffff',
+      border: `1px solid ${props.content?.cardBorderColor || '#e5e7eb'}`,
+      borderRadius: `${props.content?.cardBorderRadius ?? 8}px`,
+      fontSize: `${props.content?.fontSize ?? 14}px`,
+    }));
+
+    const openButtonStyle = computed(() => ({
+      backgroundColor: resolvedPrimaryColor.value,
+      color: '#ffffff',
+      borderColor: resolvedPrimaryColor.value,
+      fontSize: `${props.content?.fontSize ?? 14}px`,
+    }));
+
+    const editButtonStyle = computed(() => ({
+      backgroundColor: '#ffffff',
+      color: resolvedOutlineColor.value,
+      borderColor: resolvedOutlineColor.value,
+      fontSize: `${props.content?.fontSize ?? 14}px`,
+    }));
+
+    const folderNameStyle = computed(() => ({
+      color: props.content?.folderNameColor || '#2d6a4f',
+      fontSize: `${props.content?.fontSize ?? 14}px`,
+    }));
+
+    const labelStyle = computed(() => ({
+      color: props.content?.labelTextColor || '#6b7280',
+      fontSize: `${props.content?.fontSize ?? 14}px`,
+    }));
+
+    const valueStyle = computed(() => ({
+      color: props.content?.valueTextColor || '#111827',
+      fontSize: `${props.content?.fontSize ?? 14}px`,
+    }));
+
+    const checkedBoxStyle = computed(() => ({
+      backgroundColor: resolvedPrimaryColor.value,
+      borderColor: resolvedPrimaryColor.value,
+    }));
+
+    const uncheckedBoxStyle = computed(() => ({
+      backgroundColor: '#ffffff',
+      borderColor: '#d1d5db',
+    }));
+
+    const emptyStateStyle = computed(() => ({
+      color: props.content?.labelTextColor || '#6b7280',
+      fontSize: `${props.content?.fontSize ?? 14}px`,
+    }));
+
+    // ============================================================
+    // AI POLICY HELPERS
+    // ============================================================
+    const getAiPolicyText = (mode) => {
+      const m = String(mode ?? '').trim();
+      if (m === 'Enabled') return 'Deep scan (content analysis)';
+      if (m === 'Metadata') return 'Quick scan (metadata only)';
+      return 'Disabled';
+    };
+
+    const getAiPolicyIcon = (mode) => {
+      const m = String(mode ?? '').trim();
+      if (m === 'Enabled') return '🔍';
+      if (m === 'Metadata') return '⚡';
+      return '';
+    };
+
+    // ============================================================
+    // EVENT HANDLERS
+    // ============================================================
+    const handleOpen = (item) => {
+      const payload = item?._original ?? item;
+      setSelectedItem(payload);
+      emit('trigger-event', {
+        name: 'open-click',
+        event: { folder: payload },
+      });
+    };
+
+    const handleEdit = (item) => {
+      const payload = item?._original ?? item;
+      setSelectedItem(payload);
+      emit('trigger-event', {
+        name: 'edit-click',
+        event: { folder: payload },
+      });
+    };
+
+    const handleNameClick = (item) => {
+      const payload = item?._original ?? item;
+      setSelectedItem(payload);
+      emit('trigger-event', {
+        name: 'name-click',
+        event: { folder: payload },
+      });
+    };
+
+    // ============================================================
+    // EXPOSE TO TEMPLATE
+    // ============================================================
+    return {
+      processedItems,
+      // Styles
+      containerStyle,
+      cardStyle,
+      openButtonStyle,
+      editButtonStyle,
+      folderNameStyle,
+      labelStyle,
+      valueStyle,
+      checkedBoxStyle,
+      uncheckedBoxStyle,
+      emptyStateStyle,
+      // Helpers
+      getAiPolicyText,
+      getAiPolicyIcon,
+      // Handlers
+      handleOpen,
+      handleEdit,
+      handleNameClick,
+      // Internal variables (available via WeWeb variable panel)
+      selectedItem,
+      itemCount,
+      /* wwEditor:start */
+      isEditing,
+      /* wwEditor:end */
+    };
+  },
+};
+</script>
+
+<style lang="scss" scoped>
+// ─────────────────────────────────────────────────────────────────────────────
+// ROOT WRAPPER — never hardcode width/height; adapts to WeWeb dimensions
+// ─────────────────────────────────────────────────────────────────────────────
+.folder-card-list {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CARD
+// ─────────────────────────────────────────────────────────────────────────────
+.folder-card {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  // Defaults via CSS variables set on the root
+  background: var(--fcl-card-bg, #ffffff);
+  border: 1px solid var(--fcl-card-border, #e5e7eb);
+  border-radius: var(--fcl-card-radius, 8px);
+  font-size: var(--fcl-font-size, 14px);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTION ROW
+// ─────────────────────────────────────────────────────────────────────────────
+.card-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 18px;
+  border-radius: 999px;           // Pill shape
+  font-size: var(--fcl-font-size, 14px);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+
+  &:hover {
+    opacity: 0.82;
+  }
+
+  &:active {
+    opacity: 0.65;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--fcl-primary, #2d6a4f);
+    outline-offset: 2px;
+  }
+}
+
+.btn-open {
+  // Colours driven by inline style from openButtonStyle computed
+  border: 1.5px solid transparent;
+}
+
+.btn-edit {
+  // Colours driven by inline style from editButtonStyle computed
+  border: 1.5px solid;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOLDER NAME
+// ─────────────────────────────────────────────────────────────────────────────
+.folder-name-field {
+  margin-top: 2px;
+}
+
+.folder-name {
+  color: var(--fcl-name-color, #2d6a4f);
+  font-size: var(--fcl-font-size, 14px);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  display: inline;
+
+  &:hover {
+    opacity: 0.72;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--fcl-name-color, #2d6a4f);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FIELD ROWS (label + value)
+// ─────────────────────────────────────────────────────────────────────────────
+.card-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.field-label {
+  color: var(--fcl-label-color, #6b7280);
+  font-size: var(--fcl-font-size, 14px);
+  font-weight: 400;
+  flex-shrink: 0;
+}
+
+.field-value {
+  color: var(--fcl-value-color, #111827);
+  font-size: var(--fcl-font-size, 14px);
+  font-weight: 500;
+  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI POLICY
+// ─────────────────────────────────────────────────────────────────────────────
+.ai-policy-value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ai-policy-icon {
+  font-size: 1em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHECKBOX (display-only)
+// ─────────────────────────────────────────────────────────────────────────────
+.checkbox-value {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.checkbox-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1.5px solid #d1d5db;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  pointer-events: none;
+  user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+
+  // Checked state colours are driven by inline checkedBoxStyle
+}
+
+.checkmark-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMPTY STATE
+// ─────────────────────────────────────────────────────────────────────────────
+.empty-state {
+  width: 100%;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--fcl-label-color, #6b7280);
+  font-size: var(--fcl-font-size, 14px);
+  box-sizing: border-box;
+}
+</style>
