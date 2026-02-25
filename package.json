@@ -1,0 +1,11 @@
+{
+  "name": "entrustia-folder-cards",
+  "version": "1.0.0",
+  "scripts": {
+    "serve": "weweb-cli serve",
+    "build": "weweb-cli build"
+  },
+  "devDependencies": {
+    "@weweb/cli": "latest"
+  }
+}
