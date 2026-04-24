@@ -1,6 +1,6 @@
 <template>
   <div class="folder-card-list" :style="containerStyle">
-    <!-- Card for each processed folder -->
+
     <div
       v-for="item in processedItems"
       :key="item.id"
@@ -45,20 +45,14 @@
       <!-- Files -->
       <div class="card-field">
         <span class="field-label" :style="labelStyle">Files</span>
-        <span class="field-value" :style="valueStyle">
-          {{ item.file_count ?? 0 }}
-        </span>
+        <span class="field-value" :style="valueStyle">{{ item.file_count ?? 0 }}</span>
       </div>
 
       <!-- AI Policy -->
       <div class="card-field">
         <span class="field-label" :style="labelStyle">AI Policy</span>
         <span class="field-value ai-policy-value" :style="valueStyle">
-          <span
-            v-if="getAiPolicyIcon(item.read_content_mode)"
-            class="ai-policy-icon"
-            aria-hidden="true"
-          >{{ getAiPolicyIcon(item.read_content_mode) }}</span>
+          <span v-if="getAiPolicyIcon(item.read_content_mode)" class="ai-policy-icon" aria-hidden="true">{{ getAiPolicyIcon(item.read_content_mode) }}</span>
           {{ getAiPolicyText(item.read_content_mode) }}
         </span>
       </div>
@@ -69,45 +63,50 @@
         <span class="field-value checkbox-value">
           <span
             class="checkbox-box"
-            :class="{ 'checkbox-checked': item.has_public_portal }"
             :style="item.has_public_portal ? checkedBoxStyle : uncheckedBoxStyle"
             aria-hidden="true"
           >
-            <svg
-              v-if="item.has_public_portal"
-              class="checkmark-icon"
-              width="10"
-              height="8"
-              viewBox="0 0 10 8"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M1 4L3.5 6.5L9 1"
-                stroke="white"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
+            <svg v-if="item.has_public_portal" width="10" height="8" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
         </span>
       </div>
+
+      <!-- View Only Link -->
+      <div class="card-field">
+        <span class="field-label" :style="labelStyle">View Only Link</span>
+        <button
+          class="btn-share-link"
+          :style="shareLinkButtonStyle"
+          type="button"
+          @click="handleShareLink(item)"
+          @mouseenter="setShareHover(item.id, true)"
+          @mouseleave="setShareHover(item.id, false)"
+          title="Copy view-only link"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="2" width="8" height="6" rx="1" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <rect x="8" y="16" width="8" height="6" rx="1" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <rect x="2" y="9" width="8" height="6" rx="1" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <line x1="16" y1="5" x2="20" y2="5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="20" y1="5" x2="16" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="16" y1="19" x2="20" y2="19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="20" y1="19" x2="16" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Empty state -->
-    <div
-      v-if="!processedItems.length"
-      class="empty-state"
-      :style="emptyStateStyle"
-    >
+    <div v-if="!processedItems.length" class="empty-state" :style="emptyStateStyle">
       No folders to display.
     </div>
   </div>
 </template>
 
 <script>
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 export default {
   name: 'FolderCardList',
@@ -127,7 +126,9 @@ export default {
     const isEditing = computed(() => props.wwEditorState?.isEditing);
     /* wwEditor:end */
 
-    // Internal variables
+    // ── Call composables at top level of setup() — NEVER inside computed ──
+    const { resolveMappingFormula } = wwLib.wwFormula.useFormula();
+
     const { value: selectedItem, setValue: setSelectedItem } =
       wwLib.wwVariable.useComponentVariable({
         uid: props.uid,
@@ -144,26 +145,25 @@ export default {
         defaultValue: 0,
       });
 
-    // Processed items
+    // Hover state for share link button
+    const shareHoverState = ref({});
+    const setShareHover = (id, val) => {
+      shareHoverState.value = { ...shareHoverState.value, [id]: val };
+    };
+
     const processedItems = computed(() => {
       const items = props.content?.data || [];
-      const { resolveMappingFormula } = wwLib.wwFormula.useFormula();
 
       return items.map((item) => {
-        const id =
-          resolveMappingFormula(props.content?.dataIdFormula, item) ?? item?.id;
-        const name =
-          resolveMappingFormula(props.content?.dataNameFormula, item) ?? item?.name;
-        const file_count =
-          resolveMappingFormula(props.content?.dataFileCountFormula, item) ?? item?.file_count;
-        const read_content_mode =
-          resolveMappingFormula(props.content?.dataReadContentModeFormula, item) ?? item?.read_content_mode;
-        const has_public_portal =
-          resolveMappingFormula(props.content?.dataHasPublicPortalFormula, item) ?? item?.has_public_portal;
+        const id = resolveMappingFormula(props.content?.dataIdFormula, item) ?? item?.id;
+        const name = resolveMappingFormula(props.content?.dataNameFormula, item) ?? item?.name;
+        const file_count = resolveMappingFormula(props.content?.dataFileCountFormula, item) ?? item?.file_count;
+        const read_content_mode = resolveMappingFormula(props.content?.dataReadContentModeFormula, item) ?? item?.read_content_mode;
+        const has_public_portal = resolveMappingFormula(props.content?.dataHasPublicPortalFormula, item) ?? item?.has_public_portal;
 
         return {
           ...item,
-          id: id ?? `item-${Math.random()}`,
+          id: id ?? 'item-' + Math.random(),
           name: name ?? 'Untitled',
           file_count: file_count ?? 0,
           read_content_mode: read_content_mode ?? '',
@@ -173,15 +173,8 @@ export default {
       });
     });
 
-    watch(
-      processedItems,
-      (items) => {
-        setItemCount(items?.length ?? 0);
-      },
-      { immediate: true }
-    );
+    watch(processedItems, (items) => { setItemCount(items?.length ?? 0); }, { immediate: true });
 
-    // Computed styles
     const resolvedPrimaryColor = computed(() => props.content?.primaryColor || '#2d6a4f');
     const resolvedOutlineColor = computed(() => props.content?.outlineColor || '#2d6a4f');
 
@@ -190,52 +183,57 @@ export default {
       '--fcl-outline': resolvedOutlineColor.value,
       '--fcl-card-bg': props.content?.cardBackground || '#ffffff',
       '--fcl-card-border': props.content?.cardBorderColor || '#e5e7eb',
-      '--fcl-card-radius': `${props.content?.cardBorderRadius ?? 8}px`,
+      '--fcl-card-radius': (props.content?.cardBorderRadius ?? 8) + 'px',
       '--fcl-label-color': props.content?.labelTextColor || '#6b7280',
       '--fcl-value-color': props.content?.valueTextColor || '#111827',
       '--fcl-name-color': props.content?.folderNameColor || '#2d6a4f',
-      '--fcl-gap': `${props.content?.cardGap ?? 12}px`,
-      '--fcl-font-size': `${props.content?.fontSize ?? 14}px`,
+      '--fcl-gap': (props.content?.cardGap ?? 12) + 'px',
+      '--fcl-font-size': (props.content?.fontSize ?? 14) + 'px',
       display: 'flex',
       flexDirection: 'column',
-      gap: `${props.content?.cardGap ?? 12}px`,
+      gap: (props.content?.cardGap ?? 12) + 'px',
       width: '100%',
     }));
 
     const cardStyle = computed(() => ({
       background: props.content?.cardBackground || '#ffffff',
-      border: `1px solid ${props.content?.cardBorderColor || '#e5e7eb'}`,
-      borderRadius: `${props.content?.cardBorderRadius ?? 8}px`,
-      fontSize: `${props.content?.fontSize ?? 14}px`,
+      border: '1px solid ' + (props.content?.cardBorderColor || '#e5e7eb'),
+      borderRadius: (props.content?.cardBorderRadius ?? 8) + 'px',
+      fontSize: (props.content?.fontSize ?? 14) + 'px',
     }));
 
     const openButtonStyle = computed(() => ({
       backgroundColor: resolvedPrimaryColor.value,
       color: '#ffffff',
       borderColor: resolvedPrimaryColor.value,
-      fontSize: `${props.content?.fontSize ?? 14}px`,
+      fontSize: (props.content?.fontSize ?? 14) + 'px',
     }));
 
     const editButtonStyle = computed(() => ({
       backgroundColor: '#ffffff',
       color: resolvedOutlineColor.value,
       borderColor: resolvedOutlineColor.value,
-      fontSize: `${props.content?.fontSize ?? 14}px`,
+      fontSize: (props.content?.fontSize ?? 14) + 'px',
+    }));
+
+    const shareLinkButtonStyle = computed(() => ({
+      color: resolvedPrimaryColor.value,
+      borderColor: resolvedPrimaryColor.value,
     }));
 
     const folderNameStyle = computed(() => ({
       color: props.content?.folderNameColor || '#2d6a4f',
-      fontSize: `${props.content?.fontSize ?? 14}px`,
+      fontSize: (props.content?.fontSize ?? 14) + 'px',
     }));
 
     const labelStyle = computed(() => ({
       color: props.content?.labelTextColor || '#6b7280',
-      fontSize: `${props.content?.fontSize ?? 14}px`,
+      fontSize: (props.content?.fontSize ?? 14) + 'px',
     }));
 
     const valueStyle = computed(() => ({
       color: props.content?.valueTextColor || '#111827',
-      fontSize: `${props.content?.fontSize ?? 14}px`,
+      fontSize: (props.content?.fontSize ?? 14) + 'px',
     }));
 
     const checkedBoxStyle = computed(() => ({
@@ -250,10 +248,9 @@ export default {
 
     const emptyStateStyle = computed(() => ({
       color: props.content?.labelTextColor || '#6b7280',
-      fontSize: `${props.content?.fontSize ?? 14}px`,
+      fontSize: (props.content?.fontSize ?? 14) + 'px',
     }));
 
-    // AI Policy helpers
     const getAiPolicyText = (mode) => {
       const m = String(mode ?? '').trim();
       if (m === 'Enabled') return 'Deep scan (content analysis)';
@@ -268,7 +265,6 @@ export default {
       return '';
     };
 
-    // Event handlers
     const handleOpen = (item) => {
       const payload = item?._original ?? item;
       setSelectedItem(payload);
@@ -287,12 +283,19 @@ export default {
       emit('trigger-event', { name: 'name-click', event: { folder: payload } });
     };
 
+    const handleShareLink = (item) => {
+      const payload = item?._original ?? item;
+      setSelectedItem(payload);
+      emit('trigger-event', { name: 'share-link-click', event: { folder: payload } });
+    };
+
     return {
       processedItems,
       containerStyle,
       cardStyle,
       openButtonStyle,
       editButtonStyle,
+      shareLinkButtonStyle,
       folderNameStyle,
       labelStyle,
       valueStyle,
@@ -304,6 +307,8 @@ export default {
       handleOpen,
       handleEdit,
       handleNameClick,
+      handleShareLink,
+      setShareHover,
       selectedItem,
       itemCount,
       /* wwEditor:start */
@@ -351,16 +356,12 @@ export default {
   line-height: 1.4;
   white-space: nowrap;
   cursor: pointer;
-  transition: opacity 0.15s ease, box-shadow 0.15s ease;
+  transition: opacity 0.15s ease;
   user-select: none;
 }
 
 .btn-action:hover { opacity: 0.82; }
 .btn-action:active { opacity: 0.65; }
-.btn-action:focus-visible {
-  outline: 2px solid var(--fcl-primary, #2d6a4f);
-  outline-offset: 2px;
-}
 
 .btn-open { border: 1.5px solid transparent; }
 .btn-edit { border: 1.5px solid; }
@@ -379,11 +380,6 @@ export default {
 }
 
 .folder-name:hover { opacity: 0.72; }
-.folder-name:focus-visible {
-  outline: 2px solid var(--fcl-name-color, #2d6a4f);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
 
 .card-field {
   display: flex;
@@ -441,12 +437,29 @@ export default {
   flex-shrink: 0;
   pointer-events: none;
   user-select: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.checkmark-icon {
-  display: block;
+.btn-share-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1.5px solid;
+  background: transparent;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
   flex-shrink: 0;
+  padding: 0;
+}
+
+.btn-share-link:hover {
+  opacity: 0.75;
+}
+
+.btn-share-link:active {
+  opacity: 0.5;
 }
 
 .empty-state {
