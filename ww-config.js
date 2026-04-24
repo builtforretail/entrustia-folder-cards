@@ -367,5 +367,10 @@ export default {
       label: { en: 'On folder name click' },
       event: { folder: null },
     },
+    {
+      name: 'share-link-click',
+      label: { en: 'On View Only Link click' },
+      event: { folder: null },
+    },
   ],
 };
